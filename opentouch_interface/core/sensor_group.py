@@ -153,7 +153,9 @@ class SensorGroup:
         self._is_recording = True
 
         for sensor in self.sensors:
-            sensor.start_recording()
+            # sensor.start_recording()
+            deltazero = sensor.start_recording()
+            return deltazero
 
     def stop_recording(self):
         """Stop recording"""

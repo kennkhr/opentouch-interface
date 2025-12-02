@@ -360,7 +360,8 @@ class TouchSensor(ABC):
                         loop_start = time.monotonic()
 
                         # Time stamps
-                        delta = time.time() - self._recording_start_time
+                        delta = time.perf_counter() - self._recording_start_time
+                        # delta = time.time() - self._recording_start_time
                         process_data(data, delta)
 
                         # Determine how much time was spent in processing.
@@ -392,7 +393,7 @@ class TouchSensor(ABC):
     # -------------------------------------------------------------------------
     # Recording Control Methods
     # -------------------------------------------------------------------------
-    def start_recording(self) -> None:
+    def start_recording(self) -> float:
         """
         Begin recording data for all active data streams.
         Initializes the active buffer and sets the recording flag.
@@ -401,8 +402,11 @@ class TouchSensor(ABC):
             with self._buffer_lock:
                 # Clear the active buffer before starting recording.
                 self._recorded_buffers[self._active_buffer_index] = {}
-            self._recording_start_time = time.time()
+            self._recording_start_time = time.perf_counter()
+            # self._recording_start_time = time.time()
             self._is_recording = True
+
+            return self._recording_start_time
 
     def stop_recording(self):
         """
