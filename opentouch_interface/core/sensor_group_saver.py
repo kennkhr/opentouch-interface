@@ -255,7 +255,8 @@ class SensorGroupSaver:
         """
         chunk_index = 0
         while not self._stop_event.is_set():
-            time.sleep(5)  # Wait for 5 seconds between data chunks.
+            # time.sleep(5)  # Wait for 5 seconds between data chunks.
+            time.sleep(1)
 
             # For each sensor, call its read_buffer() method to get data and durations
             sensor_data = {}

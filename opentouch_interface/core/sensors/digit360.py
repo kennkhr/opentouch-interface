@@ -25,7 +25,7 @@ class Digit360Sensor(TouchSensor):
 
     def connect(self):
         self.sensor = Digit360(self.get('descriptor'))
-        time.sleep(1)
+        # time.sleep(1)
         for idx, val in enumerate(self.get('led_values')):
             self.set('led', (idx, val))
 
