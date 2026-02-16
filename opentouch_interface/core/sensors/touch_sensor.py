@@ -317,7 +317,14 @@ class TouchSensor(ABC):
             def process_data(data_, delta_):
                 self._recent_values.insert({data_stream: data_})
                 if self._is_recording and delta_:
-                    binary_data = serializer.serialize(data_stream, data_, delta_)
+                    try:
+                        binary_data = serializer.serialize(data_stream, data_, delta_)
+                    except Exception as e:
+                        warnings.warn(
+                            f"[{self.get('sensor_name')}][{data_stream}] Failed to serialize frame: {e}",
+                            UserWarning
+                        )
+                        return
                     with self._buffer_lock:
                         self._recorded_buffers[self._active_buffer_index].setdefault(data_stream, []).append(
                             binary_data)

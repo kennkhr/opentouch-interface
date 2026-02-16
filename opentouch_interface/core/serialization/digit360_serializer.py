@@ -1,4 +1,6 @@
 import struct
+import math
+from enum import Enum
 
 import numpy as np
 
@@ -25,6 +27,51 @@ class DigitSensorSerializer(BaseSerializer):
 
     def __init__(self) -> None:
         super().__init__()
+
+    @staticmethod
+    def _coerce_uint(value, bits: int, default: int = 0) -> int:
+        max_value = (1 << bits) - 1
+        if value is None:
+            return default
+        if isinstance(value, Enum):
+            value = value.value
+        try:
+            if isinstance(value, str):
+                value = value.strip()
+                if value == "":
+                    return default
+                # Accept both "123" and "123.0"
+                parsed = float(value) if "." in value else int(value)
+                value = int(parsed)
+            else:
+                value = int(value)
+        except (TypeError, ValueError, OverflowError):
+            return default
+
+        if value < 0:
+            return 0
+        if value > max_value:
+            return max_value
+        return value
+
+    @staticmethod
+    def _coerce_float(value, default: float = 0.0) -> float:
+        if value is None:
+            return default
+        if isinstance(value, Enum):
+            value = value.value
+        try:
+            parsed = float(value)
+        except (TypeError, ValueError, OverflowError):
+            return default
+        if not math.isfinite(parsed):
+            return default
+        f32_max = np.finfo(np.float32).max
+        if parsed > f32_max:
+            return float(f32_max)
+        if parsed < -f32_max:
+            return float(-f32_max)
+        return parsed
 
     # --------------------------------------------------
     # 1) Camera Stream
@@ -78,28 +125,28 @@ class DigitSensorSerializer(BaseSerializer):
             # Custom serialization for IMU.
             imu_dict = data["imu"]
             # Top-level timestamp (ts)
-            ts = imu_dict.get("ts", 0)
+            ts = self._coerce_uint(imu_dict.get("ts", 0), bits=32)
             # Raw sub-message (24 bytes: I Q f f f)
             raw = imu_dict.get("raw", {})
-            sensor_raw = raw.get("sensor_", 0)
-            ts_ght_raw = raw.get("ts_ght", 0)
-            x_raw = raw.get("x", 0.0)
-            y_raw = raw.get("y", 0.0)
-            z_raw = raw.get("z", 0.0)
+            sensor_raw = self._coerce_uint(raw.get("sensor_", 0), bits=32)
+            ts_ght_raw = self._coerce_uint(raw.get("ts_ght", 0), bits=64)
+            x_raw = self._coerce_float(raw.get("x", 0.0))
+            y_raw = self._coerce_float(raw.get("y", 0.0))
+            z_raw = self._coerce_float(raw.get("z", 0.0))
             # Euler sub-message (20 bytes: Q f f f)
             euler = imu_dict.get("euler", {})
-            ts_ght_euler = euler.get("ts_ght", 0)
-            heading = euler.get("heading", 0.0)
-            pitch = euler.get("pitch", 0.0)
-            roll = euler.get("roll", 0.0)
+            ts_ght_euler = self._coerce_uint(euler.get("ts_ght", 0), bits=64)
+            heading = self._coerce_float(euler.get("heading", 0.0))
+            pitch = self._coerce_float(euler.get("pitch", 0.0))
+            roll = self._coerce_float(euler.get("roll", 0.0))
             # Quat sub-message (28 bytes: Q f f f f f)
             quat = imu_dict.get("quat", {})
-            ts_ght_quat = quat.get("ts_ght", 0)
-            x_quat = quat.get("x", 0.0)
-            y_quat = quat.get("y", 0.0)
-            z_quat = quat.get("z", 0.0)
-            w_quat = quat.get("w", 0.0)
-            accuracy = quat.get("accuracy", 0.0)
+            ts_ght_quat = self._coerce_uint(quat.get("ts_ght", 0), bits=64)
+            x_quat = self._coerce_float(quat.get("x", 0.0))
+            y_quat = self._coerce_float(quat.get("y", 0.0))
+            z_quat = self._coerce_float(quat.get("z", 0.0))
+            w_quat = self._coerce_float(quat.get("w", 0.0))
+            accuracy = self._coerce_float(quat.get("accuracy", 0.0))
             # Define the format string:
             # "I" for ts, then raw: "I Q f f f", euler: "Q f f f", quat: "Q f f f f f"
             fmt = "I" + "I Q f f f" + "Q f f f" + "Q f f f f f"
