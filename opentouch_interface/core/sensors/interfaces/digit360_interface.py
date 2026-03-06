@@ -5,7 +5,7 @@ import struct
 import time
 import warnings
 from dataclasses import asdict, dataclass
-from typing import Any
+from typing import Any, Callable
 
 import betterproto
 import cv2
@@ -13,6 +13,26 @@ import numpy as np
 import pyudev
 import serial
 from cobs import cobs
+
+
+_CAMERA_READ_FAILURE_HANDLER: Callable[[str], None] | None = None
+
+
+def set_digit360_camera_read_failure_handler(handler: Callable[[str], None] | None) -> None:
+    """Register a process-wide callback invoked on Digit360 camera read failure."""
+    global _CAMERA_READ_FAILURE_HANDLER
+    _CAMERA_READ_FAILURE_HANDLER = handler
+
+
+def _notify_digit360_camera_read_failure(message: str) -> None:
+    handler = _CAMERA_READ_FAILURE_HANDLER
+    if handler is None:
+        return
+    try:
+        handler(message)
+    except Exception:
+        # Never let callback errors break sensor threads.
+        pass
 
 
 class LightingChannel(betterproto.Enum):
@@ -187,9 +207,11 @@ class Digit360:
         self._device_buffer = bytearray()  # A buffer to temporarily store incoming data from the device
         self._dev: serial.Serial | None = None  # Serial device instance, initialized later when connecting
 
+        self.serial = descriptor.serial
         self.port = descriptor.data  # Serial port identifier
         self.port_timeout = port_timeout  # Timeout setting for the serial port (None means no timeout)
         self.ics = descriptor.ics
+        self._camera_failure_notified = False
 
         if self.ics == '':
             raise ValueError("ICS must not be empty")
@@ -228,6 +250,11 @@ class Digit360:
 
                 return cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             else:
+                if not self._camera_failure_notified:
+                    self._camera_failure_notified = True
+                    _notify_digit360_camera_read_failure(
+                        f"Digit360 camera read failed (serial={self.serial}, ics={self.ics})"
+                    )
                 # Reconnect the camera immediately
                 self._camera.release()
                 self._camera = cv2.VideoCapture(self.ics)
