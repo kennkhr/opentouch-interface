@@ -16,6 +16,7 @@ from cobs import cobs
 
 
 _CAMERA_READ_FAILURE_HANDLER: Callable[[str], None] | None = None
+_SERIAL_READ_FAILURE_HANDLER: Callable[[str], None] | None = None
 
 
 def set_digit360_camera_read_failure_handler(handler: Callable[[str], None] | None) -> None:
@@ -24,8 +25,25 @@ def set_digit360_camera_read_failure_handler(handler: Callable[[str], None] | No
     _CAMERA_READ_FAILURE_HANDLER = handler
 
 
+def set_digit360_serial_read_failure_handler(handler: Callable[[str], None] | None) -> None:
+    """Register a process-wide callback invoked on Digit360 serial read failure."""
+    global _SERIAL_READ_FAILURE_HANDLER
+    _SERIAL_READ_FAILURE_HANDLER = handler
+
+
 def _notify_digit360_camera_read_failure(message: str) -> None:
     handler = _CAMERA_READ_FAILURE_HANDLER
+    if handler is None:
+        return
+    try:
+        handler(message)
+    except Exception:
+        # Never let callback errors break sensor threads.
+        pass
+
+
+def notify_digit360_serial_read_failure(message: str) -> None:
+    handler = _SERIAL_READ_FAILURE_HANDLER
     if handler is None:
         return
     try:
@@ -199,7 +217,7 @@ class Digit360Descriptor:
 
 class Digit360:
     # def __init__(self, port: str, port_timeout: float = None) -> None:
-    def __init__(self, descriptor: Digit360Descriptor, port_timeout: float = None) -> None:
+    def __init__(self, descriptor: Digit360Descriptor, port_timeout: float = 0.1) -> None:
         self.overruns = 0  # Tracks the number of errors due to IndexError or KeyError while decoding
         self.tlc = 0  # Total life count of successfully processed packets
         self.cerr = 0  # Counts the number of COBS decoding errors encountered
@@ -268,7 +286,7 @@ class Digit360:
         warnings.warn(f'Failed to reconnect after {max_retries} attempts. Returning None.', UserWarning)
         return None
 
-    def _read_device(self) -> bytearray:
+    def _read_device(self) -> bytearray | None:
         i = self._device_buffer.find(b"\x00")
         if i >= 0:
             r = self._device_buffer[: i + 1]
@@ -277,6 +295,8 @@ class Digit360:
         while True:
             i = max(1, min(2048, self._dev.in_waiting))
             data = self._dev.read(i)
+            if not data:
+                return None
             i = data.find(b"\x00")
             if i >= 0:
                 r = self._device_buffer + data[: i + 1]
@@ -285,8 +305,10 @@ class Digit360:
             else:
                 self._device_buffer.extend(data)
 
-    def read(self) -> Digit360Message:
+    def read(self) -> Digit360Message | None:
         data = self._read_device()
+        if data is None:
+            return None
         data = self.decode(data)
         return data
 

@@ -395,7 +395,25 @@ class TouchSensor(ABC):
                 self._config.data_streams.remove(data_stream)
 
         if data_stream in self._threads:
-            self._threads[data_stream].join()
+            worker = self._threads[data_stream]
+            if worker is threading.current_thread():
+                warnings.warn(
+                    f"[{self.get('sensor_name')}][{data_stream}] stop requested from the worker thread itself; "
+                    "skipping join.",
+                    UserWarning
+                )
+                return
+
+            join_timeout_s = 2.0
+            worker.join(timeout=join_timeout_s)
+            if worker.is_alive():
+                warnings.warn(
+                    f"[{self.get('sensor_name')}][{data_stream}] worker thread did not stop within "
+                    f"{join_timeout_s:.1f}s; continuing shutdown.",
+                    UserWarning
+                )
+            else:
+                self._threads.pop(data_stream, None)
 
     # -------------------------------------------------------------------------
     # Recording Control Methods

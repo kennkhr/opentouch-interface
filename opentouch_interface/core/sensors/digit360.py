@@ -12,7 +12,7 @@ import sounddevice as sd
 
 from opentouch_interface.core.registries.class_registries import SensorClassRegistry
 from opentouch_interface.core.sensors.interfaces.digit360_interface import Digit360, PressureApData, ImuData, \
-    PressureData, GasHtData
+    PressureData, GasHtData, notify_digit360_serial_read_failure
 from opentouch_interface.core.sensors.touch_sensor import TouchSensor
 from opentouch_interface.core.validation.sensors.digit360_config import Digit360Config
 
@@ -24,7 +24,7 @@ class Digit360Sensor(TouchSensor):
         self.sensor: Digit360 | None = None
 
     def connect(self):
-        self.sensor = Digit360(self.get('descriptor'))
+        self.sensor = Digit360(self.get('descriptor'), port_timeout=float(self.get('serial_port_timeout_s')))
         # time.sleep(1)
         for idx, val in enumerate(self.get('led_values')):
             self.set('led', (idx, val))
@@ -55,10 +55,12 @@ class Digit360Sensor(TouchSensor):
 
     @TouchSensor.data_source("serial", frequency=100)  # Assuming a frequency of 100 Hz for serial data
     def read_serial(self):
-        while True:
+        while self.is_running("serial"):
             try:
                 # Read at maximum capacity
                 data = self.sensor.read()
+                if data is None:
+                    continue
                 frame_name, frame_type = betterproto.which_one_of(data, "type")
 
                 if isinstance(frame_type, PressureApData):
@@ -74,7 +76,14 @@ class Digit360Sensor(TouchSensor):
                     yield {"gas": asdict(frame_type)}  # noqa (type is correct)
 
             except Exception as e:
+                if not self.is_running("serial"):
+                    break
                 warnings.warn(f"Error reading serial data: {e}", UserWarning)
+                sensor_serial = getattr(self.get("descriptor"), "serial", "unknown")
+                notify_digit360_serial_read_failure(f"serial={sensor_serial}: {e}")
+                time.sleep(0.01)
+                if not self.is_running("serial"):
+                    break
 
     @TouchSensor.data_source("audio", frequency=10)
     def read_audio(self):

@@ -16,6 +16,7 @@ class Digit360Config(TouchSensorConfig):
     # Optional
     # RGB values for the eight LEDs (defaults to (0, 0, 0) for all LEDs)
     led_values: clist = Field(default_factory=lambda: [[0, 0, 0]] * 8)
+    serial_port_timeout_s: float = Field(default=0.1, gt=0.0)
 
     # The descriptor is not supposed to be set by the user. This is done automatically by the interface.
     descriptor: Digit360Descriptor = Field(default=None)
