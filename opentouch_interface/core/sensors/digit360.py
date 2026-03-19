@@ -26,20 +26,27 @@ class Digit360Sensor(TouchSensor):
     def connect(self):
         self.sensor = Digit360(self.get('descriptor'), port_timeout=float(self.get('serial_port_timeout_s')))
         # time.sleep(1)
-        for idx, val in enumerate(self.get('led_values')):
-            self.set('led', (idx, val))
+        for channel, val in enumerate(self.get('led_values'), start=1):
+            self.set('led', (channel, val))
 
     def set(self, attr: str, value: Any) -> Any:
         """
         Configures sensor settings like LEDs, etc.
         """
         if attr == 'led':
-            # Assume 'value' looks like (channel_id, (r, g, b)) where r, g and b are values in the range [0, 255]
-            idx, rgb = value
+            # 'value' is (channel, (r, g, b)); channel uses 1-based numbering [1..8].
+            channel, rgb = value
+            max_channel = len(self._config.led_values)
+            if not (1 <= channel <= max_channel):
+                raise ValueError(f"LED channel {channel} is out of range [1, {max_channel}].")
             rgb = [max(0, min(elem, 255)) for elem in rgb]
 
-            self.sensor.led_set_channel(channel=idx, rgb=tuple(rgb))
-            self._config.led_values[idx] = rgb
+            # Store in config-order list (0-based index), but command uses 1-based channel id.
+            self.sensor.led_set_channel(channel=channel, rgb=tuple(rgb))
+            self._config.led_values[channel - 1] = rgb
+            return rgb
+
+        return super().set(attr, value)
 
     def disconnect(self):
         """

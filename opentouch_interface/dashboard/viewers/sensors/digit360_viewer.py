@@ -65,8 +65,8 @@ class Digit360Viewer(BaseViewer):
             led_values = Digit360Viewer._string_to_led_values(response['text'])
 
             if led_values:
-                for idx, val in enumerate(led_values):
-                    self.sensor.set('led', (idx, val))
+                for channel, val in enumerate(led_values, start=1):
+                    self.sensor.set('led', (channel, val))
 
     @render('camera', projection='camera', count=1)
     def display_camera(self, data):
@@ -246,8 +246,8 @@ class Digit360Viewer(BaseViewer):
     @staticmethod
     def _led_values_to_string(led_array: list[tuple[int, int, int]]) -> str:
         result = ["Scheme: LED ID: (R, G, B)\nSave: Ctrl+Return"]
-        for i, values in enumerate(led_array):
-            result.append(f"LED {i}: ({values[0]}, {values[1]}, {values[2]})")
+        for channel, values in enumerate(led_array, start=1):
+            result.append(f"LED {channel}: ({values[0]}, {values[1]}, {values[2]})")
         return "\n".join(result)
 
     @staticmethod

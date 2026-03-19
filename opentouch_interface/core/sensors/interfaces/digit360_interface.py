@@ -406,7 +406,13 @@ class Digit360:
             time.sleep(0.001)
 
     def led_set_channel(self, channel: int, rgb: tuple) -> Digit360Message:
+        if not (LightingChannel.CHANNEL_1 <= channel <= LightingChannel.CHANNEL_8):
+            raise ValueError(
+                f"Lighting channel must be in [{LightingChannel.CHANNEL_1}, {LightingChannel.CHANNEL_8}], got {channel}."
+            )
         lighting_msg = LightingControl()
+        # Keep parity with official ROS2 defaults (lighting_alpha=255).
+        lighting_msg.alpha = 255
         lighting_msg.channel = channel
         lighting_msg.r = rgb[0]
         lighting_msg.g = rgb[1]
