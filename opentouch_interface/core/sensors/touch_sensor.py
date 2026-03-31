@@ -315,7 +315,16 @@ class TouchSensor(ABC):
             serializer: BaseSerializer = serializer_cls()
 
             def process_data(data_, delta_):
-                self._recent_values.insert({data_stream: data_})
+                payload = {data_stream: data_}
+                try:
+                    if delta_ is not None:
+                        delta_val = float(delta_)
+                        payload["delta"] = delta_val
+                        if self._recording_start_time is not None:
+                            payload["time_perf"] = float(self._recording_start_time) + delta_val
+                except Exception:
+                    pass
+                self._recent_values.insert(payload)
                 if self._is_recording and delta_:
                     try:
                         binary_data = serializer.serialize(data_stream, data_, delta_)
